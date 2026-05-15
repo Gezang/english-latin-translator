@@ -30,6 +30,13 @@ Both source (Latin) and target (English) share a single BPE tokenizer, trained o
 
 Two models were trained for 40 epochs — one with `emb_dim=256` and one with `emb_dim=512`. The difference in outcome is stark.
 
+| Model | BLEU Score |
+|---|---|
+| emb_dim=256 | 0.048 |
+| emb_dim=512 | 0.060 |
+
+While both scores are low in absolute terms (expected at this stage of training), the 512-dim model scores 25% higher. The qualitative outputs below explain why the gap is understated by BLEU — the 256-dim model collapsed entirely.
+
 Full sample outputs on the validation set are in [output_256.txt](output_256.txt) and [output_512.txt](output_512.txt).
 
 ### emb_dim=256 — Model Collapse
@@ -48,7 +55,7 @@ Model:    "And all nations shall see their face, and shall see their face,
            and their eyes shall be turned away from them."
 ```
 
-Every single input — from a one-word sentence to a long complex clause — produces this identical output. The model learned to minimise loss by latching onto a high-frequency phrase pattern rather than learning to translate.
+Every single input — from a one-word sentence to a long complex clause — produces this identical output. The model learned to minimize loss by latching onto a high-frequency phrase pattern rather than learning to translate.
 
 ### emb_dim=512 — Learning Real Translations
 
