@@ -84,3 +84,15 @@ Model:    "Thy foot is foolishly in the house: and a man that is experienced
 ```
 
 The 512-dim model demonstrates word-level alignment, correct syntactic ordering, and semantic fidelity — a significant improvement over the collapsed 256-dim model. Remaining errors are largely in rare vocabulary and long-range dependencies.
+
+---
+
+## Future Work
+
+### Beam Search Decoding
+
+Implement beam search decoding as an alternative to the current greedy decoding inference method.
+
+### Pre-trained Encoder / Embeddings
+
+Replace the from-scratch BPE embeddings and encoder with a pre-trained BERT model to improve representation quality, particularly for rare vocabulary and morphologically rich Latin.
