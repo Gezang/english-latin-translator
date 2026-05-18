@@ -142,7 +142,8 @@ def translate_greedy(model, tokenizer: PreTrainedTokenizerBase,
 
 def translate_beam(model, tokenizer: PreTrainedTokenizerBase,
                    sentence: str, device: torch.device,
-                   max_length: int = 128, beam_size: int = 5) -> str:
+                   max_length: int = 128, beam_size: int = 5,
+                   length_normalization: float = 1) -> str:
     """Beam-search decoding. Returns the highest length-normalized hypothesis."""
     model.eval()
     core = model.module if isinstance(model, torch.nn.DataParallel) else model
@@ -195,7 +196,8 @@ def translate_beam(model, tokenizer: PreTrainedTokenizerBase,
             for i in eos_positions.tolist():
                 seq = tokens[i].tolist()
                 length = len(seq) - 1
-                finished.append((scores[i].item() / length, seq))
+                finished.append(
+                    (scores[i].item() / (length**length_normalization), seq))
                 scores[i] = float("-inf")
 
             # Once we have k complete hypotheses, no still-active beam can
@@ -212,7 +214,8 @@ def translate_beam(model, tokenizer: PreTrainedTokenizerBase,
                 continue
             seq = tokens[i].tolist()
             length = len(seq) - 1
-            finished.append((scores[i].item() / length, seq))
+            finished.append(
+                (scores[i].item() / (length**length_normalization), seq))
 
         _, best_tokens = max(finished, key=lambda x: x[0])
         return tokenizer.decode(best_tokens[1:], skip_special_tokens=True)
