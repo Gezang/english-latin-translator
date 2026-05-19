@@ -254,10 +254,29 @@ def evaluate_bleu(model, tokenizer, device, samples) -> float:
     return sum(scores) / len(scores)
 
 
+def _strip_module_prefix(state_dict):
+    # Checkpoints saved from DataParallel/DistributedDataParallel have a
+    # "module." prefix on every key; strip it so the state_dict loads into
+    # the unwrapped model.
+    if any(k.startswith("module.") for k in state_dict):
+        return {k[len("module."):] if k.startswith("module.") else k: v
+                for k, v in state_dict.items()}
+    return state_dict
+
+
 def train(model, train_loader, val_loader, tokenizer, device,
           num_epochs: int = 3, save: bool = False, checkpoint=None,
           checkpoint_prefix: str = "checkpoint"):
     pad_id = tokenizer.pad_token_id
+
+    start_epoch = 0
+    if checkpoint is not None:
+        state = _strip_module_prefix(checkpoint["model_state"])
+        model.load_state_dict(state)
+
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+    model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -265,16 +284,10 @@ def train(model, train_loader, val_loader, tokenizer, device,
     criterion = torch.nn.CrossEntropyLoss(
         ignore_index=pad_id, label_smoothing=0.1)
 
-    start_epoch = 0
     if checkpoint is not None:
         start_epoch = checkpoint["epoch"]
-        model.load_state_dict(checkpoint["model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         scheduler.load_state_dict(checkpoint["scheduler_state"])
-
-    if torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model)
-    model.to(device)
 
     bleu_samples = random.sample(list(val_loader.dataset), 50)
     total_epochs = start_epoch + num_epochs
@@ -317,6 +330,15 @@ def train_amp(model, train_loader, val_loader, tokenizer, device,
     """Training loop with mixed-precision (fp16 autocast + GradScaler). CUDA only."""
     pad_id = tokenizer.pad_token_id
 
+    start_epoch = 0
+    if checkpoint is not None:
+        state = _strip_module_prefix(checkpoint["model_state"])
+        model.load_state_dict(state)
+
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+    model.to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=1)
@@ -324,18 +346,12 @@ def train_amp(model, train_loader, val_loader, tokenizer, device,
         ignore_index=pad_id, label_smoothing=0.1)
     scaler = torch.amp.GradScaler("cuda")
 
-    start_epoch = 0
     if checkpoint is not None:
         start_epoch = checkpoint["epoch"]
-        model.load_state_dict(checkpoint["model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         scheduler.load_state_dict(checkpoint["scheduler_state"])
         if "scaler_state" in checkpoint:
             scaler.load_state_dict(checkpoint["scaler_state"])
-
-    if torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model)
-    model.to(device)
 
     bleu_samples = random.sample(list(val_loader.dataset), 50)
     total_epochs = start_epoch + num_epochs
@@ -364,7 +380,7 @@ def train_amp(model, train_loader, val_loader, tokenizer, device,
               f"Loss: {total_loss/len(train_loader):.4f}, "
               f"Val Loss: {val_loss:.4f}, BLEU: {bleu:.4f}")
 
-        if save and (epoch + 1) % 2 == 0:
+        if save and (epoch + 1) % 10 == 0:
             torch.save({
                 "epoch": epoch + 1,
                 "model_state": model.state_dict(),
@@ -406,10 +422,16 @@ def run(model_factory: ModelFactory,
         num_epochs: int = 20,
         save: bool = True,
         use_amp: bool = False):
-    tokenizer = build_tokenizer(tokenizer_name)
     device = get_device()
 
     train_raw, val_raw, test_raw = load_data()
+
+    training_texts = None
+    if tokenizer_name == "BPE":
+        training_texts = [d["la"] for d in train_raw] + \
+            [d["en"] for d in train_raw]
+    tokenizer = build_tokenizer(tokenizer_name, training_texts=training_texts)
+
     train_loader, val_loader, test_loader = build_loaders(
         train_raw, val_raw, test_raw, tokenizer, batch_size=batch_size)
 
@@ -439,5 +461,5 @@ def _bert_decoder_factory(tokenizer: PreTrainedTokenizerBase) -> torch.nn.Module
 if __name__ == "__main__":
     run(model_factory=_bert_decoder_factory,
         run_name="bert_decoder", num_epochs=15, use_amp=True,
-        batch_size=64)
+        batch_size=32)
     # run(model_factory=_ted_factory, run_name="ted")

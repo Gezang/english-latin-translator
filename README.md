@@ -10,34 +10,35 @@ The training data is the [`grosenthal/latin_english_translation`](https://huggin
 
 The model is a **Transformer encoder-decoder**, implemented from scratch using `torch.nn.Transformer` primitives.
 
-| Component | Detail |
-|---|---|
-| Architecture | Transformer encoder-decoder |
-| Tokenizer | Byte-Pair Encoding (BPE), shared vocab |
-| Vocabulary size | 16,000 tokens |
-| Encoder/Decoder layers | 3 each |
-| Attention heads | 8 |
-| Positional encoding | Sinusoidal |
-| Optimizer | Adam (lr=1e-4) with ReduceLROnPlateau |
-| Loss | Cross-entropy with label smoothing (0.1) |
-| Inference | Greedy decoding |
+| Component              | Detail                                                                |
+| ---------------------- | --------------------------------------------------------------------- |
+| Architecture           | Transformer encoder-decoder                                           |
+| Tokenizer              | Byte-Pair Encoding (BPE) or `bert-base-multilingual-cased`, shared vocab |
+| Vocabulary size        | 16,000 (BPE) / ~120,000 (BERT)                                        |
+| Encoder/Decoder layers | 3 each                                                                |
+| Attention heads        | 8                                                                     |
+| Positional encoding    | Sinusoidal                                                            |
+| Optimizer              | Adam (lr=1e-4) with ReduceLROnPlateau                                 |
+| Loss                   | Cross-entropy with label smoothing (0.1)                              |
+| Inference              | Greedy decoding                                                       |
 
-Both source (Latin) and target (English) share a single BPE tokenizer, trained on the combined corpus. A `LengthBucketSampler` groups sequences of similar length together to reduce padding waste during training.
+Both source (Latin) and target (English) share a single tokenizer. A `LengthBucketSampler` groups sequences of similar length together to reduce padding waste during training.
 
 ---
 
-## Progress: 256 vs 512 Embedding Dimension
+## Results
 
-Two models were trained for 40 epochs — one with `emb_dim=256` and one with `emb_dim=512`. The difference in outcome is stark.
+Three variants of the model were trained for 40 epochs and evaluated on the test set.
 
-| Model | BLEU Score |
-|---|---|
-| emb_dim=256 | 0.048 |
-| emb_dim=512 | 0.060 |
+| Model                                                 | BLEU Score |
+| ----------------------------------------------------- | ---------- |
+| emb_dim=256, BPE tokenizer                            | 0.048      |
+| emb_dim=512, BPE tokenizer                            | 0.060      |
+| emb_dim=512, `bert-base-multilingual-cased` tokenizer | 0.1379     |
 
-While both scores are low in absolute terms (expected at this stage of training), the 512-dim model scores 25% higher. The qualitative outputs below explain why the gap is understated by BLEU — the 256-dim model collapsed entirely.
+Holding the architecture fixed and swapping the from-scratch BPE tokenizer for the pre-trained multilingual BERT WordPiece tokenizer **more than doubles BLEU**. The qualitative outputs below show why — the gap is even larger than the BLEU number suggests.
 
-Full sample outputs on the validation set are in [output_256.txt](output_256.txt) and [output_512.txt](output_512.txt).
+Full sample outputs are in [results/output_256.txt](results/output_256.txt), [results/output_512.txt](results/output_512.txt), and [results/output_512_ver2.txt](results/output_512_ver2.txt).
 
 ### emb_dim=256 — Model Collapse
 
@@ -84,6 +85,41 @@ Model:    "Thy foot is foolishly in the house: and a man that is experienced
 ```
 
 The 512-dim model demonstrates word-level alignment, correct syntactic ordering, and semantic fidelity — a significant improvement over the collapsed 256-dim model. Remaining errors are largely in rare vocabulary and long-range dependencies.
+
+### emb_dim=512, BERT tokenizer — Cleaner Subwords, Fluent Output
+
+Keeping the architecture fixed and switching only the tokenizer to `bert-base-multilingual-cased` produces noticeably more fluent translations, often within a few word choices of the reference:
+
+```
+Latin:    "ipsi autem sicut Adam transgressi sunt pactum
+           ibi praevaricati sunt in me"
+English:  "But they, like Adam, have transgressed the covenant,
+           there have they dealt treacherously against me."
+Model:    "But they themselves, as Adam, went over the covenant,
+           there they transgressed in me."
+
+Latin:    "et veniebant de cunctis populis ad audiendam sapientiam
+           Salomonis et ab universis regibus terrae qui audiebant
+           sapientiam eius"
+English:  "And they came from all nations to hear the wisdom of Solomon,
+           and from all the kings of the earth, who heard of his wisdom."
+Model:    "And there came of all the people to hear the wisdom of Solomon,
+           and from all the kings of the earth, that heard his wisdom."
+
+Latin:    "et ad populum sic locutus est haec dicit Dominus Deus
+           Israhel trans fluvium habitaverunt patres vestri ab initio
+           Thare pater Abraham et Nahor servieruntque diis alienis"
+English:  "And he spoke thus to the people: Thus saith the Lord the God
+           of Israel: Your fathers dwelt of old on the other side of the
+           river, Thare the father of Abraham, and Nachor: and they
+           served strange gods."
+Model:    "And thus spoke to the people: Thus saith the Lord the God of
+           Israel: Your fathers dwelt beyond the river, from the beginning
+           of Thare, the father of Abraham, and Nachor: and they served
+           strange gods."
+```
+
+Two things stand out compared with the from-scratch BPE runs above. First, the visible subword spacing (`fooli sh ly`, `as s`, `fe et`) is gone — the pre-trained WordPiece vocabulary covers the target English far more cleanly. Second, rare proper nouns (`Salomon`, `Thare`, `Abraham`, `Nahor`) survive the encoder–decoder round-trip intact, which the from-scratch BPE model frequently mangled. The remaining errors are subtler: dropped or rearranged clauses rather than collapsed syntax.
 
 ---
 
