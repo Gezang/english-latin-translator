@@ -1,6 +1,6 @@
-# Latin-to-English Neural Machine Translator
+# Latin-to-English Encoder-Decoder Translator
 
-A from-scratch neural machine translation model that translates classical Latin text into English, built with PyTorch.
+A from-scratch transformer based translation model that translates classical Latin text into English, built with PyTorch.
 
 The training data is the [`grosenthal/latin_english_translation`](https://huggingface.co/datasets/grosenthal/latin_english_translation) dataset from HuggingFace, which contains parallel Latin–English sentence pairs drawn from a wide range of classical and biblical sources.
 
