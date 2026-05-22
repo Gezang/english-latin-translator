@@ -20,7 +20,7 @@ The model is a **Transformer encoder-decoder**, implemented from scratch using `
 | Positional encoding    | Sinusoidal                                                               |
 | Optimizer              | Adam (lr=1e-4) with ReduceLROnPlateau                                    |
 | Loss                   | Cross-entropy with label smoothing (0.1)                                 |
-| Inference              | Greedy decoding                                                          |
+| Inference              | Greedy decoding, Beam Search                                             |
 
 Both source (Latin) and target (English) share a single tokenizer. A `LengthBucketSampler` groups sequences of similar length together to reduce padding waste during training.
 
