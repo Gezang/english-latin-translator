@@ -4,3 +4,4 @@ datasets>=2.18
 tokenizers>=0.15
 nltk>=3.8
 tqdm>=4.66
+sacrebleu>=2.3
