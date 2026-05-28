@@ -140,4 +140,8 @@ Two things stand out compared with the from-scratch BPE runs above. First, the v
 
 ### Pre-trained Encoder / Embeddings
 
-Change to a pre-trained BERT model as encoder to improve representation quality.
+Use a pre-trained BERT model as encoder to improve representation quality.
+
+### Flash Attention
+
+Replace the standard `torch.nn.Transformer` attention with [FlashAttention](https://github.com/Dao-AILab/flash-attention) to speed up both training and inference. FlashAttention computes exact attention in tiled blocks that fit in SRAM, avoiding the O(N²) materialization of the attention matrix in HBM — yielding wall-clock speedups and a smaller memory footprint, especially at longer sequence lengths. This would let the model train on longer contexts within the same GPU budget and reduce per-token latency at decode time.

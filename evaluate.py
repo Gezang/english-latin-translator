@@ -85,34 +85,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-def evaluate_kaggle(model_checkpoint: str = None):
-    device = torch.get_device()
-
-    # get data
-    train_raw, val_raw, test_raw = load_data()
-
-    tokenizer = build_tokenizer()
-    _, _, test_loader = build_loaders(
-        train_raw, val_raw, test_raw, tokenizer, batch_size=32)
-    name = "ted"
-    model = _build_model(name, tokenizer).to(device)
-    _load_state(model, model_checkpoint, device)
-    model.eval()
-
-    criterion = torch.nn.CrossEntropyLoss(
-        ignore_index=tokenizer.pad_token_id, label_smoothing=0.1)
-    test_loss = evaluate(model, test_loader, criterion, device)
-
-    samples = list(test_loader.dataset)
-    greedy_bleu = _corpus_bleu(
-        translate_greedy, model, tokenizer, device, samples)
-
-    def beam_fn(m, t, sentence, d):
-        return translate_beam(m, t, sentence, d, beam_size=5)
-    beam_bleu = _corpus_bleu(beam_fn, model, tokenizer, device, samples)
-
-    print(f"Test Loss:           {test_loss:.4f}")
-    print(f"Greedy BLEU:         {greedy_bleu}")
-    print(f"Beam (k=5) BLEU:  {beam_bleu}")
